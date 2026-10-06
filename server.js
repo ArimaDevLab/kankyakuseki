@@ -54,29 +54,33 @@ const emit = (room, data) => {
   for (const res of room.listeners) res.write(line);
 };
 
+// 動作確認用の数字（個人や部屋を特定する情報は含めない）。GET /api/status で見られる
+const stats = { started: Date.now(), pings: 0, reacts: 0, authFailed: 0, lastAuthError: '' };
+const authError = (why) => { stats.authFailed++; stats.lastAuthError = why; return null; };
+
 // ---- 認証: Twitchが視聴者ごとに発行するJWTを検証する ----
 function verifyJwt(token) {
   const [h, p, s] = token.split('.');
-  if (!h || !p || !s) return null;
+  if (!h || !p || !s) return authError('not a JWT');
   try {
-    if (JSON.parse(Buffer.from(h, 'base64url')).alg !== 'HS256') return null;
+    if (JSON.parse(Buffer.from(h, 'base64url')).alg !== 'HS256') return authError('wrong alg');
     const sig = Buffer.from(s, 'base64url');
     const want = crypto.createHmac('sha256', SECRET).update(h + '.' + p).digest();
-    if (sig.length !== want.length || !crypto.timingSafeEqual(sig, want)) return null;
+    if (sig.length !== want.length || !crypto.timingSafeEqual(sig, want)) return authError('bad signature (EXT_SECRET mismatch?)');
     const body = JSON.parse(Buffer.from(p, 'base64url'));
-    if (!body.exp || body.exp * 1000 < Date.now()) return null;
-    if (!body.channel_id || !body.opaque_user_id) return null;
+    if (!body.exp || body.exp * 1000 < Date.now()) return authError('expired');
+    if (!body.channel_id || !body.opaque_user_id) return authError('missing channel_id/opaque_user_id');
     return { room: String(body.channel_id), user: String(body.opaque_user_id), role: body.role };
-  } catch { return null; }
+  } catch { return authError('malformed'); }
 }
 function identify(req) {
   const m = /^Bearer (.+)$/.exec(req.headers.authorization || '');
-  if (!m) return null;
+  if (!m) return authError('no token');
   let who;
   if (SECRET) who = verifyJwt(m[1]);
   else { // テストモード: "dev.部屋名.適当なID"
     const d = /^dev\.([\w-]{1,40})\.([\w-]{1,40})$/.exec(m[1]);
-    who = d && { room: d[1], user: d[2], role: 'broadcaster' };
+    who = d ? { room: d[1], user: d[2], role: 'broadcaster' } : authError('not a test token');
   }
   if (!who) return null;
   // 画面側にはTwitchのIDを渡さず、ハッシュした短いIDだけを使う
@@ -136,6 +140,14 @@ http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && url.pathname === '/api/status') {
+    let viewers = 0, overlays = 0;
+    for (const r of rooms.values()) { viewers += r.viewers.size; overlays += r.listeners.size; }
+    return json(res, 200, { mode: SECRET ? 'twitch' : 'test', uptimeSec: Math.round((Date.now() - stats.started) / 1000),
+      rooms: rooms.size, viewers, overlays, pings: stats.pings, reacts: stats.reacts,
+      authFailed: stats.authFailed, lastAuthError: stats.lastAuthError });
+  }
+
   // 設定の読み出し（誰でも）
   if (req.method === 'GET' && url.pathname === '/api/config') {
     const name = url.searchParams.get('room') || '';
@@ -161,6 +173,7 @@ http.createServer(async (req, res) => {
     }
     const v = touch(room, who.id);
     if (!v) return json(res, 503, { error: 'full' });
+    if (url.pathname === '/api/ping') stats.pings++;
     if (url.pathname === '/api/ping') return json(res, 200, { id: who.id, config: getConfig(who.room) });
     if (url.pathname === '/api/react') {
       const { type } = await readJson(req);
@@ -169,6 +182,7 @@ http.createServer(async (req, res) => {
       const now = Date.now();
       if (now - v.lastReact < REACT_GAP_MS) return json(res, 429, { error: 'slow down' });
       v.lastReact = now;
+      stats.reacts++;
       emit(room, { t: 'react', id: who.id, type });
       return json(res, 200, { id: who.id });
     }
