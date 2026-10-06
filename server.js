@@ -3,6 +3,7 @@
 // 環境変数:
 //   PORT        待ち受けポート（既定 8080）
 //   EXT_SECRET  Twitch拡張機能のシークレット(base64)。未設定ならテストモードで動く
+//   SUPABASE_URL / SUPABASE_KEY  設定の保存先（Supabase）。未設定なら data/rooms.json に保存する
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -26,9 +27,35 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; cha
 const rooms = new Map(); // room -> { viewers: Map(id -> {seen, lastReact}), listeners: Set(res) }
 
 // ---- チャンネルごとの設定（独自の言葉・季節の帽子） ----
+// 保存先はSupabase（環境変数があるとき）か、手元のファイル。読んだものは configs に覚えておく
+const DB_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+const DB_KEY = process.env.SUPABASE_KEY || '';
+const USE_DB = Boolean(DB_URL && DB_KEY);
+const DB_HEADERS = { apikey: DB_KEY, Authorization: 'Bearer ' + DB_KEY, 'Content-Type': 'application/json' };
 let configs = {};
-try { configs = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { /* 初回はファイルなし */ }
+if (!USE_DB) { try { configs = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { /* 初回はファイルなし */ } }
 const getConfig = (name) => configs[name] || { custom: [], season: 'auto' };
+
+// その部屋の設定をまだ読んでいなければ、Supabaseから読む（部屋ごとに1回だけ）
+const loaded = new Set();
+const loading = new Map();
+function ensureConfig(name) {
+  if (!USE_DB || loaded.has(name)) return Promise.resolve();
+  if (!loading.has(name)) {
+    const url = DB_URL + '/rest/v1/rooms?select=config&room=eq.' + encodeURIComponent(name);
+    loading.set(name, fetch(url, { headers: DB_HEADERS, signal: AbortSignal.timeout(8000) })
+      .then(async (r) => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const rows = await r.json();
+        if (rows[0]) configs[name] = cleanConfig(rows[0].config);
+        loaded.add(name);
+        stats.dbError = '';
+      })
+      .catch((e) => { stats.dbError = 'load: ' + e.message; console.error('config load failed:', e.message); }) // 次回また試す
+      .finally(() => loading.delete(name)));
+  }
+  return loading.get(name);
+}
 function cleanConfig(c) {
   const custom = [];
   for (const x of Array.isArray(c && c.custom) ? c.custom : []) {
@@ -39,7 +66,18 @@ function cleanConfig(c) {
   }
   return { custom, season: SEASONS.has(c && c.season) ? c.season : 'auto' };
 }
-function saveConfig(name, config) {
+async function saveConfig(name, config) {
+  if (USE_DB) {
+    const r = await fetch(DB_URL + '/rest/v1/rooms', {
+      method: 'POST', signal: AbortSignal.timeout(8000),
+      headers: { ...DB_HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ room: name, config, updated_at: new Date().toISOString() }),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    loaded.add(name);
+    configs[name] = config;
+    return;
+  }
   configs[name] = config;
   fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
   fs.writeFileSync(DATA_FILE, JSON.stringify(configs, null, 2));
@@ -55,7 +93,7 @@ const emit = (room, data) => {
 };
 
 // 動作確認用の数字（個人や部屋を特定する情報は含めない）。GET /api/status で見られる
-const stats = { started: Date.now(), pings: 0, reacts: 0, authFailed: 0, lastAuthError: '' };
+const stats = { started: Date.now(), pings: 0, reacts: 0, authFailed: 0, lastAuthError: '', dbError: '' };
 const authError = (why) => { stats.authFailed++; stats.lastAuthError = why; return null; };
 
 // ---- 認証: Twitchが視聴者ごとに発行するJWTを検証する ----
@@ -131,6 +169,7 @@ http.createServer(async (req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/events') {
     const name = url.searchParams.get('room') || '';
     if (!/^[\w-]{1,40}$/.test(name)) return json(res, 400, { error: 'room' });
+    await ensureConfig(name);
     const room = getRoom(name);
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache',
       Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
@@ -145,13 +184,15 @@ http.createServer(async (req, res) => {
     for (const r of rooms.values()) { viewers += r.viewers.size; overlays += r.listeners.size; }
     return json(res, 200, { mode: SECRET ? 'twitch' : 'test', uptimeSec: Math.round((Date.now() - stats.started) / 1000),
       rooms: rooms.size, viewers, overlays, pings: stats.pings, reacts: stats.reacts,
-      authFailed: stats.authFailed, lastAuthError: stats.lastAuthError });
+      authFailed: stats.authFailed, lastAuthError: stats.lastAuthError,
+      storage: USE_DB ? 'supabase' : 'file', dbError: stats.dbError });
   }
 
   // 設定の読み出し（誰でも）
   if (req.method === 'GET' && url.pathname === '/api/config') {
     const name = url.searchParams.get('room') || '';
     if (!/^[\w-]{1,40}$/.test(name)) return json(res, 400, { error: 'room' });
+    await ensureConfig(name);
     return json(res, 200, getConfig(name));
   }
 
@@ -159,6 +200,7 @@ http.createServer(async (req, res) => {
   if (req.method === 'POST' && url.pathname.startsWith('/api/')) {
     const who = identify(req);
     if (!who) return json(res, 401, { error: 'auth' });
+    await ensureConfig(who.room);
     const room = getRoom(who.room);
     if (url.pathname === '/api/leave') {
       if (room.viewers.delete(who.id)) emit(room, { t: 'leave', id: who.id });
@@ -167,7 +209,11 @@ http.createServer(async (req, res) => {
     if (url.pathname === '/api/config') { // 設定の保存は配信者だけ
       if (who.role !== 'broadcaster') return json(res, 403, { error: 'broadcaster only' });
       const config = cleanConfig(await readJson(req));
-      saveConfig(who.room, config);
+      try { await saveConfig(who.room, config); stats.dbError = ''; } catch (e) {
+        stats.dbError = 'save: ' + e.message;
+        console.error('config save failed:', e.message);
+        return json(res, 502, { error: 'storage' });
+      }
       emit(room, { t: 'config', config });
       return json(res, 200, config);
     }
@@ -202,7 +248,7 @@ http.createServer(async (req, res) => {
   }
   res.writeHead(405); res.end();
 }).listen(PORT, () => {
-  console.log(`kankyakuseki server: http://localhost:${PORT}  (${SECRET ? 'Twitch mode' : 'TEST mode - no EXT_SECRET'})`);
+  console.log(`kankyakuseki server: http://localhost:${PORT}  (${SECRET ? 'Twitch mode' : 'TEST mode - no EXT_SECRET'}, settings in ${USE_DB ? 'Supabase' : 'data/rooms.json'})`);
   console.log(`  viewer : http://localhost:${PORT}/viewer.html`);
   console.log(`  settings: http://localhost:${PORT}/settings.html`);
   console.log(`  overlay: http://localhost:${PORT}/overlay.html?room=dev`);
