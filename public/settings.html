@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kankyakuseki Settings</title>
+<link rel="stylesheet" href="mascot.css">
+<link rel="stylesheet" href="settings.css">
+</head>
+<body>
+<main>
+  <h1 data-t="title"></h1>
+  <section class="preview"><div id="preview"></div></section>
+
+  <section>
+    <h2 data-t="words"></h2>
+    <p class="note" data-t="wordsNote"></p>
+    <div id="rows"></div>
+  </section>
+
+  <section>
+    <h2 data-t="season"></h2>
+    <p class="note" data-t="seasonNote"></p>
+    <select id="season"></select>
+  </section>
+
+  <div class="actions">
+    <button id="save" type="button" data-t="save"></button>
+    <span id="status" role="status"></span>
+  </div>
+</main>
+<script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+<script src="config.js"></script>
+<script src="mascot.js"></script>
+<script src="settings.js"></script>
+</body>
+</html>

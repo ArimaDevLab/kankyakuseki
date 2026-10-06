@@ -1,0 +1,23 @@
+html, body { margin: 0; background: #1f2033; color: #eceefa;
+  font-family: "Hiragino Maru Gothic ProN", "Yu Gothic UI", "Meiryo", "Segoe UI", sans-serif; font-size: 15px; }
+main { max-width: 520px; margin: 0 auto; padding: 20px 16px 40px; }
+h1 { font-size: 20px; margin: 0 0 12px; }
+h2 { font-size: 16px; margin: 24px 0 4px; }
+.note { margin: 0 0 10px; color: #a9adcc; font-size: 13px; line-height: 1.6; }
+
+.preview { display: flex; justify-content: center; align-items: flex-end; height: 190px;
+  background: #2b2d42; border-radius: 16px; }
+#preview { --w: 110px; }
+
+.row { display: flex; gap: 8px; margin-bottom: 8px; }
+.row input { flex: 1 1 0; min-width: 0; }
+input, select, button { font: inherit; color: inherit; border-radius: 10px; border: 1px solid #4a4d70;
+  background: #2b2d42; padding: 8px 10px; }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid #b8a4ff; outline-offset: 1px; }
+button { cursor: pointer; background: #3a3d5c; white-space: nowrap; }
+button:hover { background: #4b4f7a; }
+#save { background: #7a5ad6; border-color: #7a5ad6; font-weight: 700; padding: 10px 28px; }
+#save:hover { background: #8d70e0; }
+.actions { display: flex; align-items: center; gap: 12px; margin-top: 28px; }
+#status { color: #a9e3b5; font-size: 14px; }
+#status.error { color: #ff9aa8; }

@@ -1,0 +1,8 @@
+{
+  "name": "kankyakuseki",
+  "version": "0.1.0",
+  "description": "Twitch audience mascots: viewers react without chatting",
+  "private": true,
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}

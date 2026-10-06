@@ -1,0 +1,30 @@
+html, body { margin: 0; height: 100%; overflow: hidden; background: transparent;
+  font-family: "Hiragino Maru Gothic ProN", "Yu Gothic UI", "Meiryo", "Segoe UI", sans-serif; }
+body.standalone { background: #2b2d42; }
+
+#hint { display: none; position: absolute; top: 16px; left: 0; right: 0; text-align: center;
+  color: #cfd2e6; font-size: 14px; padding: 0 16px; }
+body.standalone #hint { display: block; }
+
+/* 動画の右端に置く小さな操作盤。触っていないときは薄くして配信の邪魔をしない */
+#dock { position: absolute; right: 2.5%; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px;
+  border-radius: 18px; background: rgba(24, 24, 37, .78); opacity: .4; transition: opacity .2s; }
+#dock:hover, #dock:focus-within, body.standalone #dock { opacity: 1; }
+#dock.offline #btns { opacity: .35; pointer-events: none; }
+
+#me { --w: 68px; height: 86px; margin-top: 16px; }
+#btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+#btns button { width: 56px; height: 58px; padding: 4px 0 2px; border: 0; border-radius: 14px;
+  background: #3a3d5c; color: #fff; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 1px; transition: background .15s, transform .1s; }
+#btns button svg { width: 34px; height: 32px; overflow: visible; }
+#btns button:hover { background: #54589a; }
+#btns button:active { transform: scale(.9); }
+#btns button:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+
+/* チャンネル独自の言葉: 横いっぱいのボタン */
+#btns button.custom { grid-column: 1 / -1; width: 118px; height: 30px; padding: 0 8px; flex-direction: row;
+  justify-content: center; font-size: 13px; background: #5a3fa8; }
+#btns button.custom:hover { background: #7a5ad6; }
+#btns button.custom span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

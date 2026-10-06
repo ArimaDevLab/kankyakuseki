@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>観客席</title>
+<link rel="stylesheet" href="mascot.css">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: transparent;
+    font-family: "Hiragino Maru Gothic ProN", "Yu Gothic UI", "Meiryo", sans-serif; }
+  body.preview { background: #2b2d42; }
+  #seats { position: absolute; left: 0; right: 0; bottom: 0; display: flex;
+    justify-content: center; align-items: flex-end; gap: 8px; padding: 0 24px 10px; }
+  .m .name { display: none; margin-top: 2px; min-height: 1.4em; font-size: 13px; font-weight: 700; color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body.names .m .name { display: block; }
+  #hint { position: absolute; top: 16px; left: 0; right: 0; text-align: center; color: #cfd2e6;
+    font-size: 14px; line-height: 1.8; display: none; }
+  body.preview #hint { display: block; }
+  #hint kbd { background: #454866; border-radius: 4px; padding: 1px 7px; color: #fff; font-family: inherit; }
+</style>
+</head>
+<body>
+<div id="hint"></div>
+<div id="seats"></div>
+<script src="config.js"></script>
+<script src="mascot.js"></script>
+<script>
+(() => {
+  // ---- 設定（URLの後ろに ?room=dev&channel=名前 のように付ける） ----
+  //   room    : ボタン(拡張機能)からの反応を受け取る部屋。テスト中は dev
+  //   channel : Twitchチャットの文面にも反応させたいときのチャンネル名
+  //   server  : 中継サーバーのURL（省略時はこのページと同じ場所）
+  const q = new URLSearchParams(location.search);
+  const ROOM    = q.get('room') || '';
+  const CHANNEL = (q.get('channel') || '').toLowerCase().replace(/^#/, '');
+  const SERVER  = (q.get('server') || window.KANKYAKU_SERVER || location.origin).replace(/\/$/, '');
+  const MAX     = Number(q.get('max'))  || 12;   // 最大人数
+  const SIZE    = Number(q.get('size')) || 160;  // マスコットの最大幅(px)
+  const STAY    = Number(q.get('stay')) || 15;   // チャット参加者が何分黙ったら退席するか
+  if (q.get('lang')) Mascot.setLang(q.get('lang'));      // 吹き出しの言語 ja / en
+  if (q.get('bubble') === '0') Mascot.setBubbles(false);  // 吹き出しを消す
+  // 寄せる向き: left / center / right（既定は center）
+  const ALIGN = { left: 'flex-start', right: 'flex-end' }[q.get('align')] || 'center';
+  document.getElementById('seats').style.justifyContent = ALIGN;
+  if (q.get('names') === '1') document.body.classList.add('names');
+  if (!window.obsstudio) document.body.classList.add('preview');
+
+  const seatsEl = document.getElementById('seats');
+  const seats = new Map(); // id -> { el, last }   ボタン参加者のidは "x:" で始まる
+  let config = { custom: [], season: q.get('season') || 'auto' }; // 独自の言葉と季節の帽子（設定画面で変える）
+  const hat = () => Mascot.seasonHat(config.season);
+  function applyConfig(c) {
+    config = c;
+    for (const seat of seats.values()) Mascot.setHat(seat.el, hat());
+  }
+
+  function layout() {
+    const n = Math.max(seats.size, 1);
+    const w = Math.max(48, Math.min(SIZE, (innerWidth - 48) / n - 8));
+    seatsEl.style.setProperty('--w', w + 'px');
+  }
+  addEventListener('resize', layout);
+
+  function addSeat(id, label) {
+    if (seats.has(id)) return seats.get(id);
+    if (seats.size >= MAX) return null;
+    const el = Mascot.create(id, hat());
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = label || '';
+    el.appendChild(name);
+    seatsEl.appendChild(el);
+    const seat = { el, last: Date.now() };
+    seats.set(id, seat);
+    layout();
+    return seat;
+  }
+  function removeSeat(id) {
+    const seat = seats.get(id);
+    if (!seat) return;
+    seats.delete(id);
+    seat.el.classList.add('leaving');
+    setTimeout(() => { seat.el.remove(); layout(); }, 400);
+  }
+  function react(id, type, label) {
+    const seat = addSeat(id, label);
+    if (!seat) return;
+    seat.last = Date.now();
+    Mascot.react(seat.el, type, config);
+  }
+
+  // ---- ボタン(拡張機能)からの反応を中継サーバー経由で受け取る ----
+  function connectRoom() {
+    const es = new EventSource(SERVER + '/api/events?room=' + encodeURIComponent(ROOM));
+    es.onmessage = (ev) => {
+      const d = JSON.parse(ev.data);
+      if (d.config) applyConfig(d.config);
+      if (d.t === 'sync') { // 接続・再接続時に、いま見ている人の一覧と設定が届く
+        const now = new Set(d.ids.map((i) => 'x:' + i));
+        for (const id of [...seats.keys()]) if (id.startsWith('x:') && !now.has(id)) removeSeat(id);
+        for (const id of now) addSeat(id);
+      } else if (d.t === 'join') addSeat('x:' + d.id);
+      else if (d.t === 'leave') removeSeat('x:' + d.id);
+      else if (d.t === 'react') react('x:' + d.id, d.type);
+    };
+  }
+
+  // ---- チャットの文面 → 反応 ----
+  const COMMANDS = {
+    '!nod': 'nod', '!うん': 'nod', '!うなずく': 'nod',
+    '!lol': 'laugh', '!笑': 'laugh', '!w': 'laugh',
+    '!wow': 'wow', '!驚': 'wow', '!えっ': 'wow',
+    '!clap': 'clap', '!拍手': 'clap', '!888': 'clap',
+  };
+  function detect(text) {
+    const t = text.trim();
+    const own = config.custom.findIndex((c) => t.toLowerCase().includes(c.word.toLowerCase()));
+    if (own >= 0) return 'c' + own; // チャンネル独自の言葉
+    const cmd = COMMANDS[t.split(/\s+/)[0].toLowerCase()];
+    if (cmd) return cmd;
+    if (/(8{3,}|８{3,}|👏|\bclap)/i.test(t)) return 'clap';
+    if (/(\blol\b|lmao|\blul\b|kekw|草|笑|w{3,}|ｗ{2,}|😂|🤣)/i.test(t)) return 'laugh';
+    if (/(!\?|！？|\bwow\b|\bpog|えっ|まじ|マジ|😮|😲)/i.test(t)) return 'wow';
+    if (/(うん|なるほど|わかる|たしかに|確かに|\byes\b|\byeah\b|\btrue\b)/i.test(t)) return 'nod';
+    return null; // 普通のコメントは着席だけ
+  }
+  function connectChat() { // 読み取り専用・ログイン不要
+    const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
+    ws.onopen = () => {
+      ws.send('CAP REQ :twitch.tv/tags');
+      ws.send('NICK justinfan' + Math.floor(10000 + Math.random() * 80000));
+      ws.send('JOIN #' + CHANNEL);
+    };
+    ws.onmessage = (ev) => {
+      for (const line of String(ev.data).split('\r\n')) {
+        if (!line) continue;
+        if (line.startsWith('PING')) { ws.send('PONG :tmi.twitch.tv'); continue; }
+        const m = line.match(/^(?:@(\S+) )?:(\w+)!\S+ PRIVMSG #\S+ :(.*)$/);
+        if (!m) continue;
+        const tag = (m[1] || '').split(';').find((s) => s.startsWith('display-name='));
+        react(m[2], detect(m[3]), (tag && tag.slice(13)) || m[2]);
+      }
+    };
+    ws.onclose = () => setTimeout(connectChat, 5000);
+    ws.onerror = () => ws.close();
+  }
+
+  const hint = document.getElementById('hint');
+  if (ROOM) connectRoom();
+  if (CHANNEL) {
+    connectChat();
+    setInterval(() => {
+      const limit = Date.now() - STAY * 60000;
+      for (const [id, seat] of seats) if (!id.startsWith('x:') && seat.last < limit) removeSeat(id);
+    }, 30000);
+  }
+  if (ROOM || CHANNEL) {
+    hint.textContent = [ROOM && '部屋「' + ROOM + '」のボタン', CHANNEL && '#' + CHANNEL + ' のチャット']
+      .filter(Boolean).join(' と ') + ' を待っています。';
+  } else {
+    // ---- デモ: 4体が勝手に反応する。1〜4キーでも動かせる ----
+    const ids = ['mimi', 'sora', 'kuro', 'hana'];
+    ids.forEach((id, i) => setTimeout(() => addSeat(id), i * 250));
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    setInterval(() => react(pick(ids), pick(Mascot.BASE)), 2200);
+    addEventListener('keydown', (e) => {
+      const type = Mascot.BASE[Number(e.key) - 1];
+      if (type) for (const id of seats.keys()) react(id, type);
+    });
+    hint.innerHTML = 'デモ表示中　<kbd>1</kbd> うなずく　<kbd>2</kbd> 笑う　<kbd>3</kbd> 驚く　<kbd>4</kbd> 拍手';
+  }
+})();
+</script>
+</body>
+</html>
