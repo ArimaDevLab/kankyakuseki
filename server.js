@@ -4,6 +4,7 @@
 //   PORT        待ち受けポート（既定 8080）
 //   EXT_SECRET  Twitch拡張機能のシークレット(base64)。未設定ならテストモードで動く
 //   SUPABASE_URL / SUPABASE_KEY  設定の保存先（Supabase）。未設定なら data/rooms.json に保存する
+//   SUPABASE_TABLE  表の名前（既定 rooms）。既存のプロジェクトに同居させるときに変える
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -31,6 +32,7 @@ const rooms = new Map(); // room -> { viewers: Map(id -> {seen, lastReact}), lis
 const DB_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const DB_KEY = process.env.SUPABASE_KEY || '';
 const USE_DB = Boolean(DB_URL && DB_KEY);
+const DB_TABLE = /^\w+$/.test(process.env.SUPABASE_TABLE || '') ? process.env.SUPABASE_TABLE : 'rooms'; // 表の名前
 const DB_HEADERS = { apikey: DB_KEY, Authorization: 'Bearer ' + DB_KEY, 'Content-Type': 'application/json' };
 let configs = {};
 if (!USE_DB) { try { configs = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { /* 初回はファイルなし */ } }
@@ -42,7 +44,7 @@ const loading = new Map();
 function ensureConfig(name) {
   if (!USE_DB || loaded.has(name)) return Promise.resolve();
   if (!loading.has(name)) {
-    const url = DB_URL + '/rest/v1/rooms?select=config&room=eq.' + encodeURIComponent(name);
+    const url = DB_URL + '/rest/v1/' + DB_TABLE + '?select=config&room=eq.' + encodeURIComponent(name);
     loading.set(name, fetch(url, { headers: DB_HEADERS, signal: AbortSignal.timeout(8000) })
       .then(async (r) => {
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -68,7 +70,7 @@ function cleanConfig(c) {
 }
 async function saveConfig(name, config) {
   if (USE_DB) {
-    const r = await fetch(DB_URL + '/rest/v1/rooms', {
+    const r = await fetch(DB_URL + '/rest/v1/' + DB_TABLE, {
       method: 'POST', signal: AbortSignal.timeout(8000),
       headers: { ...DB_HEADERS, Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({ room: name, config, updated_at: new Date().toISOString() }),
