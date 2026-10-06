@@ -7,6 +7,7 @@
     title: '観客席の設定', words: 'チャンネル独自の言葉',
     wordsNote: '視聴者のボタンに追加されます（最大4つ・8文字まで）。空欄の行は使われません。チャットにこの言葉が書かれたときも反応します。',
     season: '季節の帽子', seasonNote: '「自動」にすると、時期に合わせてマスコットが帽子をかぶります。',
+    obs: 'OBSに入れるURL', obsNote: 'OBSの「ブラウザ」ソースのURL欄に貼り付けます。幅は配信の横幅、高さは400がおすすめです。',
     save: '保存', saved: '保存しました', failed: '保存できませんでした', loading: '読み込み中…', try: '試す',
     ph: ['例: ナイス！', '例: かわいい', '', ''],
     motions: { wow: 'ジャンプ', spin: 'くるっと回る', wave: '手を振る', clap: '拍手', laugh: '笑う', nod: 'うなずく' },
@@ -15,6 +16,7 @@
     title: 'Kankyakuseki settings', words: 'Channel words',
     wordsNote: 'Added to the viewer buttons (up to 4, 8 characters each). Empty rows are ignored. Chat messages containing a word trigger it too.',
     season: 'Seasonal hat', seasonNote: '"Auto" picks a hat for the time of year.',
+    obs: 'URL for OBS', obsNote: 'Paste into the URL field of an OBS Browser source. Width: your canvas width, height: 400.',
     save: 'Save', saved: 'Saved', failed: 'Could not save', loading: 'Loading…', try: 'Try',
     ph: ['e.g. Nice!', 'e.g. Cute', '', ''],
     motions: { wow: 'Jump', spin: 'Spin', wave: 'Wave', clap: 'Clap', laugh: 'Laugh', nod: 'Nod' },
@@ -67,6 +69,10 @@
 
   let token = null;
   async function load(room) {
+    const obsUrl = document.getElementById('obsUrl');
+    obsUrl.value = SERVER + '/overlay.html?room=' + encodeURIComponent(room);
+    obsUrl.addEventListener('focus', () => obsUrl.select());
+    document.getElementById('obs').hidden = false;
     statusEl.textContent = T.loading;
     try {
       fill(await (await fetch(SERVER + '/api/config?room=' + encodeURIComponent(room))).json());
