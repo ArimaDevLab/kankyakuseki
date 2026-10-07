@@ -42,6 +42,7 @@
 
 ## 本番（Twitch拡張機能）にするとき
 
+- Twitchにアップロードするzipには、`public` の中の `overlay.html` 以外の9ファイルを、フォルダーなしで入れます。`config.js` がTwitch上かどうかを見分けて、サーバーのURLを切り替えます
 - 環境変数 `SUPABASE_URL` と `SUPABASE_KEY`（シークレットキー）を入れると、設定をSupabaseに保存します。表は `supabase.sql` で作ります。入れない場合は `data/rooms.json` に保存します
 - `GET /api/status` で、動作モード・接続数・直近のエラーを確認できます
 - 設定を保存できるのは配信者本人だけです（テストモードでは誰でも保存できます）
