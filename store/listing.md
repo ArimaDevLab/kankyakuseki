@@ -54,6 +54,7 @@ How to test
 Technical notes
 - Backend (EBS): https://kankyakuseki.onrender.com — verifies the Twitch JWT on every request. Only the broadcaster role can save settings.
 - The free hosting tier sleeps when idle; the first request after a long pause can take up to about a minute.
+- Channel words are entered only by the broadcaster and are checked on the server against a blocklist (hate speech, explicit sexual terms, self-harm/violence). Blocked words cannot be saved.
 - No Bits, no subscriptions, no identity linking, no chat messages sent by the extension.
 - Data: the opaque user ID is hashed and kept in memory only while the viewer is watching. Channel settings are stored by channel ID.
 

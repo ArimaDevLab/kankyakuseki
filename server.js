@@ -9,6 +9,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { isBlocked } = require('./blocklist');
 
 const PORT = Number(process.env.PORT) || 8080;
 const SECRET = process.env.EXT_SECRET ? Buffer.from(process.env.EXT_SECRET, 'base64') : null;
@@ -62,7 +63,7 @@ function cleanConfig(c) {
   const custom = [];
   for (const x of Array.isArray(c && c.custom) ? c.custom : []) {
     const word = [...String((x && x.word) || '').replace(/\s+/g, ' ').trim()].slice(0, MAX_WORD).join('');
-    if (!word) continue;
+    if (!word || isBlocked(word)) continue; // 登録できない言葉は捨てる（保存時は先にエラーで知らせる）
     custom.push({ word, motion: MOTIONS.has(x.motion) ? x.motion : 'wow' });
     if (custom.length >= MAX_CUSTOM) break;
   }
@@ -210,7 +211,10 @@ http.createServer(async (req, res) => {
     }
     if (url.pathname === '/api/config') { // 設定の保存は配信者だけ
       if (who.role !== 'broadcaster') return json(res, 403, { error: 'broadcaster only' });
-      const config = cleanConfig(await readJson(req));
+      const body = await readJson(req);
+      const bad = (Array.isArray(body.custom) ? body.custom : []).map((x) => String((x && x.word) || '').trim()).filter((w) => w && isBlocked(w));
+      if (bad.length) return json(res, 400, { error: 'blocked', words: bad });
+      const config = cleanConfig(body);
       try { await saveConfig(who.room, config); stats.dbError = ''; } catch (e) {
         stats.dbError = 'save: ' + e.message;
         console.error('config save failed:', e.message);
