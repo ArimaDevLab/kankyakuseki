@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kankyakuseki – Privacy Policy</title>
+<link rel="stylesheet" href="legal.css">
+</head>
+<body>
+<main>
+  <h1>Kankyakuseki Privacy Policy</h1>
+  <p class="date">Last updated: October 7, 2026</p>
+
+  <p>Kankyakuseki is a Twitch extension that lets viewers react to a stream with small mascots, without writing in chat. This page explains what data the extension handles.</p>
+
+  <h2>What we process</h2>
+  <ul>
+    <li><strong>Viewers:</strong> While you watch a channel that uses the extension, Twitch gives the extension an anonymous, per-channel identifier (an "opaque user ID"). Our server turns it into a short one-way hash to give your mascot a seat and a color. The hash is kept in memory only while you are watching and is not written to a database. We do not receive your Twitch username, email address, or real Twitch user ID.</li>
+    <li><strong>Reactions:</strong> When you press a reaction button, the reaction type is sent to our server and forwarded to the streamer's overlay. Reactions are not stored.</li>
+    <li><strong>Streamers:</strong> We store your Twitch channel ID together with the settings you save (custom words, their motions, and the seasonal hat choice).</li>
+    <li><strong>Chat:</strong> If a streamer enables chat reactions, the overlay running in the streamer's own broadcasting software reads the public chat of that channel to trigger mascot reactions. Chat messages are not sent to or stored on our server.</li>
+  </ul>
+
+  <h2>What we do not do</h2>
+  <ul>
+    <li>We do not use cookies, advertising, or analytics trackers.</li>
+    <li>We do not sell or share data with third parties for marketing.</li>
+  </ul>
+
+  <h2>Service providers</h2>
+  <p>The server runs on Render and streamer settings are stored with Supabase. These providers process data on our behalf and may keep standard technical logs such as IP addresses.</p>
+
+  <h2>Retention and deletion</h2>
+  <p>Streamer settings are kept until you change them or ask us to delete them. To request deletion, open an issue at the address below and include your channel name.</p>
+
+  <h2>Contact</h2>
+  <p><a href="https://github.com/ArimaDevLab/kankyakuseki/issues">github.com/ArimaDevLab/kankyakuseki/issues</a></p>
+
+  <hr>
+
+  <h1 lang="ja">プライバシーポリシー（日本語）</h1>
+  <p class="date" lang="ja">最終更新日: 2026年10月7日</p>
+  <div lang="ja">
+  <p>観客席（Kankyakuseki）は、視聴者がコメントを書かずにマスコットで配信に反応できるTwitch拡張機能です。</p>
+  <ul>
+    <li><strong>視聴者:</strong> Twitchから渡される、チャンネルごとの匿名の識別子を使います。サーバーではこれを元に戻せない短い値に変換し、席と色を決めるためだけに使います。視聴中だけメモリー上に保持し、データベースには保存しません。ユーザー名、メールアドレス、本来のTwitchユーザーIDは受け取りません。</li>
+    <li><strong>反応:</strong> ボタンを押すと、反応の種類がサーバーを通って配信者のオーバーレイに届きます。保存はしません。</li>
+    <li><strong>配信者:</strong> チャンネルIDと、保存した設定（独自の言葉、動き、季節の帽子）を保存します。</li>
+    <li><strong>チャット:</strong> 配信者がチャットへの反応を有効にした場合、配信者自身の配信ソフト上のオーバーレイが、そのチャンネルの公開チャットを読み取ります。チャットの内容はサーバーに送信も保存もされません。</li>
+  </ul>
+  <p>クッキー、広告、アクセス解析は使用しません。データを第三者に販売することもありません。サーバーはRender、設定の保存はSupabaseを利用しています。</p>
+  <p>設定の削除を希望する場合は、上記のGitHubのページからチャンネル名を添えてご連絡ください。</p>
+  </div>
+</main>
+</body>
+</html>
