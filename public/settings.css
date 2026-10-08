@@ -23,3 +23,4 @@ button:hover { background: #4b4f7a; }
 #status.error { color: #ff9aa8; }
 #obsUrl { width: 100%; box-sizing: border-box; font-family: Consolas, monospace; font-size: 13px; }
 input.bad { border-color: #ff7a8a; background: #3a2230; }
+button:disabled { opacity: .45; cursor: not-allowed; }

@@ -8,7 +8,7 @@
     wordsNote: '視聴者のボタンに追加されます（最大4つ・8文字まで）。空欄の行は使われません。チャットにこの言葉が書かれたときも反応します。',
     season: '季節の帽子', seasonNote: '「自動」にすると、時期に合わせてマスコットが帽子をかぶります。',
     obs: 'OBSに入れるURL', obsNote: 'OBSの「ブラウザ」ソースのURL欄に貼り付けます。幅は配信の横幅、高さは400がおすすめです。',
-    save: '保存', saved: '保存しました', failed: '保存できませんでした', blocked: 'この言葉は登録できません: ', loading: '読み込み中…', try: '試す',
+    save: '保存', saved: '保存しました', failed: '保存できませんでした', blocked: 'この言葉は登録できません: ', loading: '読み込み中…', loadFailed: '設定を読み込めませんでした。ページを再読み込みしてください。', try: '試す',
     ph: ['例: ナイス！', '例: かわいい', '', ''],
     motions: { wow: 'ジャンプ', spin: 'くるっと回る', wave: '手を振る', clap: '拍手', laugh: '笑う', nod: 'うなずく' },
     seasons: { auto: '自動（日付で切り替え）', none: 'なし', halloween: 'ハロウィン（10月）', christmas: 'クリスマス（12月）', sakura: '桜（春）', summer: '麦わら帽子（夏）' },
@@ -17,7 +17,7 @@
     wordsNote: 'Added to the viewer buttons (up to 4, 8 characters each). Empty rows are ignored. Chat messages containing a word trigger it too.',
     season: 'Seasonal hat', seasonNote: '"Auto" picks a hat for the time of year.',
     obs: 'URL for OBS', obsNote: 'Paste into the URL field of an OBS Browser source. Width: your canvas width, height: 400.',
-    save: 'Save', saved: 'Saved', failed: 'Could not save', blocked: 'This word is not allowed: ', loading: 'Loading…', try: 'Try',
+    save: 'Save', saved: 'Saved', failed: 'Could not save', blocked: 'This word is not allowed: ', loading: 'Loading…', loadFailed: 'Could not load your settings. Please reload the page.', try: 'Try',
     ph: ['e.g. Nice!', 'e.g. Cute', '', ''],
     motions: { wow: 'Jump', spin: 'Spin', wave: 'Wave', clap: 'Clap', laugh: 'Laugh', nod: 'Nod' },
     seasons: { auto: 'Auto (by date)', none: 'None', halloween: 'Halloween (Oct)', christmas: 'Christmas (Dec)', sakura: 'Cherry blossom (spring)', summer: 'Straw hat (summer)' },
@@ -74,11 +74,24 @@
     obsUrl.value = SERVER + '/overlay.html?room=' + encodeURIComponent(room);
     obsUrl.addEventListener('focus', () => obsUrl.select());
     document.getElementById('obs').hidden = false;
+    // 読み込みが終わるまで保存させない（空の画面のまま保存すると、今の設定を消してしまうため）
+    const saveBtn = document.getElementById('save');
+    saveBtn.disabled = true;
+    statusEl.className = '';
     statusEl.textContent = T.loading;
-    try {
-      fill(await (await fetch(SERVER + '/api/config?room=' + encodeURIComponent(room))).json());
-      statusEl.textContent = '';
-    } catch { statusEl.textContent = ''; showHat(); }
+    showHat();
+    for (let attempt = 0; attempt < 8; attempt++) { // サーバーが休止明けのときは1分ほどかかるので、何度か試す
+      try {
+        const res = await fetch(SERVER + '/api/config?room=' + encodeURIComponent(room));
+        if (!res.ok) throw new Error(res.status);
+        fill(await res.json());
+        statusEl.textContent = '';
+        saveBtn.disabled = false;
+        return;
+      } catch { await new Promise((r) => setTimeout(r, 10000)); }
+    }
+    statusEl.className = 'error';
+    statusEl.textContent = T.loadFailed;
   }
   document.getElementById('save').addEventListener('click', async () => {
     statusEl.className = '';
